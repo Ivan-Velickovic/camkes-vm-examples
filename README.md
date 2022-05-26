@@ -20,7 +20,9 @@ Currently the supported platforms include:
 * x86_64 (coming)
 
 ## Getting and Building
-The following example builds the camkes arm vmm for the TK1.
+
+### For Arm
+The following example builds the ARM VMM "vm_minimal" application for the TK1. See below for other applications.
 ```bash
 repo init -u https://github.com/seL4/camkes-vm-examples-manifest.git
 repo sync
@@ -30,9 +32,7 @@ cd build
 ninja
 ```
 *Note: To buid for another platform you can substitute the value of the `-DPLATFORM` variable e.g. (exynos5422, tx1, tx2, qemu-arm-virt)*
-*Note: If building for x86 you don't need to specify the `-DPLATFORM` variable*
 
-### For Arm
 An EFI application file will be left in `images/capdl-loader-image-arm-tk1` We normally boot using TFTP, by first copying `capdl-loader-image-arm-tk1` to a tftpserver then on the U-Boot serial console doing:
 ```bash
 dhcp tftpboot $loadaddr
@@ -41,6 +41,17 @@ bootefi ${loadaddr}
 ```
 
 ### For x86
+The following example builds the x86 VMM "minimal" application. See below for other applications.
+
+```bash
+repo init -u https://github.com/seL4/camkes-vm-examples-manifest.git
+repo sync
+mkdir build
+cd build
+../init-build.sh -DCAMKES_VM_APP=minimal
+ninja
+```
+
 Boot images/kernel-x86_64-pc99 and images/capdl-loader-experimental-image-x86_64-pc99 (or \*.ia32-pc99 if built for 32-bit) with the multiboot boot loader of your choice.
 
 ## CAmkES ARM VMM Applications
