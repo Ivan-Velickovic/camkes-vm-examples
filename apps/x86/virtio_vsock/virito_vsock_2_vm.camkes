@@ -1,0 +1,90 @@
+/*
+ * Copyright 2022, UNSW (ABN 57 195 873 179)
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+import <VM/vm.camkes>;
+import <VirtQueue/VirtQueue.camkes>;
+
+#include <configurations/vm.h>
+#include <configurations/connections.h>
+
+#define SHARED_BUFSIZE 4096
+
+#define VM_GUEST_CMDLINE "earlyprintk=ttyS0,115200 console=ttyS0,115200 root=/dev/mem i8042.nokbd=iy \
+i8042.nomux=y i8042.noaux=y io_delay=udelay noisapnp pci=nomsi"
+
+#define VM0_MACADDRESS "02:00:00:00:AA:01"
+#define VM1_MACADDRESS "02:00:00:00:AA:02"
+
+#define VM0_topology_def(f) f(0,1)
+#define VM1_topology_def(f) f(1,0)
+
+#define topology_def(f) \
+    VM0_topology_def(f) \
+    VM1_topology_def(f)
+
+component Init0 {
+    consumes Ready ready;
+    emits Done done;
+    dataport Buf(SHARED_BUFSIZE) dp0;
+    dataport Buf(SHARED_BUFSIZE) dp1;
+    VM_INIT_DEF()
+    VM_CONNECTION_COMPONENT_DEF(0, topology_def)
+}
+
+component Init1 {
+    emits Ready ready;
+    consumes Done done;
+    dataport Buf(SHARED_BUFSIZE) dp0;
+    dataport Buf(SHARED_BUFSIZE) dp1;
+    VM_INIT_DEF()
+    VM_CONNECTION_COMPONENT_DEF(1, topology_def)
+}
+
+assembly {
+    composition {
+        VM_COMPOSITION_DEF()
+        VM_PER_VM_COMP_DEF(0)
+        VM_PER_VM_COMP_DEF(1)
+
+        component VirtQueueInit init;
+        VM_CONNECTION_CONNECT_VMS(init.init, topology_def)
+
+        connection seL4SharedDataWithCaps cross_vm_conn_0(from vm0.dp0, to vm1.dp0);
+        connection seL4SharedDataWithCaps cross_vm_conn_1(from vm1.dp1, to vm0.dp1);
+        connection seL4Notification event_conn_0(from vm1.ready, to vm0.ready);
+        connection seL4Notification event_conn_1(from vm0.done, to vm1.done);
+    }
+
+    configuration {
+        VM_CONNECTION_CONFIG(init.init, topology_def)
+
+        vm0.init_cons = [VM_CONNECTION_INIT_HANDLER(0,topology_def)];
+        vm1.init_cons = [VM_CONNECTION_INIT_HANDLER(1,topology_def)];
+
+        VM_CONFIGURATION_DEF()
+        VM_PER_VM_CONFIG_DEF(0)
+        vm0.simple_untyped25_pool = 95;
+        vm0.heap_size = 0x2000000;
+        vm0.guest_ram_mb = 128;
+        vm0.kernel_cmdline = VM_GUEST_CMDLINE;
+        vm0.kernel_image = "bzimage";
+        vm0.kernel_relocs = "bzimage";
+        vm0.initrd_image = "rootfs.cpio";
+        vm0.iospace_domain = 0x0f;
+        vm0.pci_devices_iospace = 1;
+
+        VM_PER_VM_CONFIG_DEF(1)
+        vm1.simple_untyped25_pool = 95;
+        vm1.heap_size = 0x2000000;
+        vm1.guest_ram_mb = 128;
+        vm1.kernel_cmdline = VM_GUEST_CMDLINE;
+        vm1.kernel_image = "bzimage";
+        vm1.kernel_relocs = "bzimage";
+        vm1.initrd_image = "rootfs.cpio";
+        vm1.iospace_domain = 0x10;
+        vm1.pci_devices_iospace = 2;
+    }
+}
